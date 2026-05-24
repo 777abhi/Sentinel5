@@ -72,6 +72,8 @@ async function main() {
   // ADO Integration
   if (!orgUrl || !token || !project) {
     console.log('ADO credentials (ADO_ORG_URL, ADO_PAT, ADO_PROJECT) not provided. Skipping API sync.');
+    const existingBugs = await readExistingBugs(CSV_FILE_PATH);
+    await generatePromptFiles(existingBugs);
     return;
   }
 
@@ -89,6 +91,8 @@ async function main() {
 
     if (!queryResult.workItems || queryResult.workItems.length === 0) {
       console.log('No bugs found matching the criteria.');
+      const existingBugs = await readExistingBugs(CSV_FILE_PATH);
+      await generatePromptFiles(existingBugs);
       return;
     }
 
@@ -186,10 +190,47 @@ async function main() {
 
     await csvWriter.writeRecords(mergedBugs);
     console.log(`Successfully wrote ${mergedBugs.length} bugs to ${CSV_FILE_PATH}.`);
+    await generatePromptFiles(mergedBugs);
 
   } catch (error) {
     console.error('Error connecting to Azure DevOps or fetching bugs:', error.message);
+    const existingBugs = await readExistingBugs(CSV_FILE_PATH);
+    await generatePromptFiles(existingBugs);
   }
 }
 
 main();
+
+
+async function generatePromptFiles(bugs) {
+  const promptsDir = path.join(__dirname, 'prompts');
+  const analysesDir = path.join(__dirname, 'analyses');
+
+  if (!fs.existsSync(promptsDir)) {
+    fs.mkdirSync(promptsDir, { recursive: true });
+  }
+  if (!fs.existsSync(analysesDir)) {
+    fs.mkdirSync(analysesDir, { recursive: true });
+  }
+
+  for (const bug of bugs) {
+    const analysisFile = path.join(analysesDir, `ANALYSIS_BUG_${bug.ID}.md`);
+    if (!fs.existsSync(analysisFile)) {
+      const promptFile = path.join(promptsDir, `PROMPT_BUG_${bug.ID}.md`);
+      const markdown = `# Bug ${bug.ID}: ${bug.Title}
+
+## Description
+${bug.Description}
+
+**Tags:** ${bug.Tags}
+**Created Date:** ${bug['Created Date']}
+**Modified Date:** ${bug['Modified Date']}
+**Comments:** ${bug.Comments || 'None'}
+`;
+      fs.writeFileSync(promptFile, markdown, 'utf8');
+      console.log(`Generated prompt file for bug ${bug.ID}`);
+    } else {
+      console.log(`Skipping bug ${bug.ID}: Analysis already exists.`);
+    }
+  }
+}
