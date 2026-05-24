@@ -1,12 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 const azdev = require('azure-devops-node-api');
+const csv = require('csv-parser');
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 const STATE_FILE_PATH = path.join(__dirname, 'state.json');
+const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
 
 function stripHtmlTags(str) {
   if (!str) return '';
   return str.replace(/<[^>]*>?/gm, '').trim();
+}
+
+function readExistingBugs(filePath) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    if (!fs.existsSync(filePath)) {
+      resolve(results);
+      return;
+    }
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => resolve(results))
+      .on('error', (err) => reject(err));
+  });
 }
 
 async function main() {
@@ -103,7 +121,71 @@ async function main() {
     });
 
     console.log('Structured and sanitized bug records:');
-    console.log(JSON.stringify(formattedBugs, null, 2));
+    // console.log(JSON.stringify(formattedBugs, null, 2)); // Optionally comment this out
+
+    const existingBugs = await readExistingBugs(CSV_FILE_PATH);
+
+    // Merge bugs (deduplicate by id)
+    const bugMap = new Map();
+
+    // Map existing bugs first
+    for (const bug of existingBugs) {
+      // Depending on CSV headers, adjust properties.
+      // Assuming headers will match the expected output.
+      bugMap.set(String(bug.ID), bug);
+    }
+
+    // Process new bugs
+    for (const newBug of formattedBugs) {
+      const bugIdStr = String(newBug.id);
+      if (bugMap.has(bugIdStr)) {
+        const existingBug = bugMap.get(bugIdStr);
+        // Compare dates if both exist
+        const existingDate = new Date(existingBug['Modified Date']);
+        const newDate = new Date(newBug.changedDate);
+        if (newDate > existingDate) {
+          // Replace with new bug
+          bugMap.set(bugIdStr, {
+            ID: newBug.id,
+            Title: newBug.title,
+            Description: newBug.description,
+            Tags: newBug.tags,
+            'Created Date': newBug.createdDate,
+            'Modified Date': newBug.changedDate,
+            Comments: existingBug.Comments || ''
+          });
+        }
+      } else {
+        bugMap.set(bugIdStr, {
+          ID: newBug.id,
+          Title: newBug.title,
+          Description: newBug.description,
+          Tags: newBug.tags,
+          'Created Date': newBug.createdDate,
+          'Modified Date': newBug.changedDate,
+          Comments: ''
+        });
+      }
+    }
+
+    const mergedBugs = Array.from(bugMap.values());
+    console.log(`Merged dataset contains ${mergedBugs.length} unique bugs.`);
+
+    const csvWriter = createCsvWriter({
+      path: CSV_FILE_PATH,
+      header: [
+        { id: 'ID', title: 'ID' },
+        { id: 'Title', title: 'Title' },
+        { id: 'Description', title: 'Description' },
+        { id: 'Tags', title: 'Tags' },
+        { id: 'Created Date', title: 'Created Date' },
+        { id: 'Modified Date', title: 'Modified Date' },
+        { id: 'Comments', title: 'Comments' }
+      ]
+    });
+
+    await csvWriter.writeRecords(mergedBugs);
+    console.log(`Successfully wrote ${mergedBugs.length} bugs to ${CSV_FILE_PATH}.`);
 
   } catch (error) {
     console.error('Error connecting to Azure DevOps or fetching bugs:', error.message);
