@@ -226,6 +226,26 @@ ${bug.Description}
 **Created Date:** ${bug['Created Date']}
 **Modified Date:** ${bug['Modified Date']}
 **Comments:** ${bug.Comments || 'None'}
+
+---
+
+## System Persona
+Act as a Principal QA and Staff Systems Architect.
+
+## Instructions
+Analyze the bug described above and provide your output in the following strict Markdown layout so it can be easily copied:
+
+### 1. 5-Why Analysis
+(Provide a rigorous 5-Why chain detailing the root cause of the issue)
+
+### 2. Fault Categorization
+(Categorize the defect into a specific technical or process fault area)
+
+### 3. Leak Stage Discovery
+(Identify the exact phase of the development lifecycle where this defect leaked and explain why)
+
+### 4. Concrete Testing Mitigations
+(Detail concrete testing mitigations and strategies to prevent this class of defect in the future)
 `;
       fs.writeFileSync(promptFile, markdown, 'utf8');
       console.log(`Generated prompt file for bug ${bug.ID}`);
