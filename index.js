@@ -6,6 +6,7 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 const STATE_FILE_PATH = path.join(__dirname, 'state.json');
 const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
+const MEMORY_FILE_PATH = path.join(__dirname, 'sentinel5_memory.md');
 
 function stripHtmlTags(str) {
   if (!str) return '';
@@ -27,10 +28,33 @@ function readExistingBugs(filePath) {
   });
 }
 
+function initializeMemoryDatabase() {
+  if (!fs.existsSync(MEMORY_FILE_PATH)) {
+    const schema = `# Sentinel5 Correlation Memory
+
+This file serves as a central vulnerability index to log known failure patterns, impacted files or directories, and historical defect tracking IDs.
+
+## Known Failure Patterns
+
+| Defect ID | Failure Pattern / Root Cause | Impacted Files / Directories | Mitigation / Notes |
+| :--- | :--- | :--- | :--- |
+| (e.g., 123) | (e.g., Null pointer on missing config) | (e.g., src/config.js) | (e.g., Added null checks in PR #45) |
+
+## Unstable System Paths
+
+* (e.g., \`/src/legacy/api.js\` - frequent regressions during updates)
+`;
+    fs.writeFileSync(MEMORY_FILE_PATH, schema, 'utf-8');
+    console.log('Initialized sentinel5_memory.md schema.');
+  }
+}
+
 async function main() {
   const orgUrl = process.env.ADO_ORG_URL;
   const token = process.env.ADO_PAT;
   const project = process.env.ADO_PROJECT;
+
+  initializeMemoryDatabase();
 
   const currentDate = new Date();
   let state;
