@@ -1,12 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const azdev = require('azure-devops-node-api');
+const GitInterfaces = require('azure-devops-node-api/interfaces/GitInterfaces');
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 
 const STATE_FILE_PATH = path.join(__dirname, 'state.json');
 const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
 const MEMORY_FILE_PATH = path.join(__dirname, 'sentinel5_memory.md');
+const REPOS_FILE_PATH = path.join(__dirname, 'repos.json');
 
 function stripHtmlTags(str) {
   if (!str) return '';
@@ -26,6 +28,19 @@ function readExistingBugs(filePath) {
       .on('end', () => resolve(results))
       .on('error', (err) => reject(err));
   });
+}
+
+
+function initializeRepositoriesList() {
+  if (!fs.existsSync(REPOS_FILE_PATH)) {
+    const defaultRepos = [
+      "org/repo-1",
+      "org/repo-2",
+      "org/repo-3"
+    ];
+    fs.writeFileSync(REPOS_FILE_PATH, JSON.stringify(defaultRepos, null, 2), 'utf-8');
+    console.log('Initialized repos.json with placeholder repositories.');
+  }
 }
 
 function initializeMemoryDatabase() {
@@ -49,12 +64,86 @@ This file serves as a central vulnerability index to log known failure patterns,
   }
 }
 
+
+async function syncPullRequests(connection, project, state) {
+  if (!fs.existsSync(REPOS_FILE_PATH)) {
+    console.log('repos.json not found, skipping multi-repo query.');
+    return;
+  }
+
+  let repos = [];
+  try {
+    const rawRepos = fs.readFileSync(REPOS_FILE_PATH, 'utf-8');
+    repos = JSON.parse(rawRepos);
+  } catch (err) {
+    console.error('Error reading repos.json:', err.message);
+    return;
+  }
+
+  if (repos.length === 0) {
+    console.log('No repositories defined in repos.json.');
+    return;
+  }
+
+  const gitApi = await connection.getGitApi();
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  console.log(`Searching for pull requests merged since ${weekAgo.toISOString()} in ${repos.length} repositories...`);
+
+  let gitRepos = [];
+  try {
+    gitRepos = await gitApi.getRepositories(project);
+  } catch (err) {
+    console.error('Failed to fetch repositories for project:', err.message);
+    return;
+  }
+
+  for (const repoName of repos) {
+    try {
+      // Find the repository ID by name
+      const targetRepo = gitRepos.find(r => r.name === repoName || repoName.endsWith(`/${r.name}`));
+
+      if (!targetRepo) {
+         console.warn(`Repository ${repoName} not found in project ${project}.`);
+         continue;
+      }
+
+      const searchCriteria = {
+        status: GitInterfaces.PullRequestStatus.Completed,
+        minTime: weekAgo
+      };
+
+      console.log(`Fetching PRs for ${repoName}...`);
+      // Use azdev's getPullRequests
+      const prs = await gitApi.getPullRequests(targetRepo.id, searchCriteria, project);
+
+      const filteredPrs = prs.filter(pr => {
+        const isTargetMatch = pr.targetRefName && (pr.targetRefName.includes('main') || pr.targetRefName.includes('release'));
+        const isRecent = pr.closedDate && new Date(pr.closedDate) >= weekAgo;
+        return isTargetMatch && isRecent;
+      });
+
+      console.log(`Found ${filteredPrs.length} relevant PRs in ${repoName}.`);
+
+      // We can do something with the PRs later, for now we just log
+      filteredPrs.forEach(pr => {
+         console.log(`  - PR #${pr.pullRequestId}: ${pr.title} (Target: ${pr.targetRefName})`);
+      });
+
+    } catch (err) {
+       console.error(`Failed to sync PRs for ${repoName}: ${err.message}`);
+    }
+  }
+}
+
 async function main() {
   const orgUrl = process.env.ADO_ORG_URL;
   const token = process.env.ADO_PAT;
   const project = process.env.ADO_PROJECT;
 
   initializeMemoryDatabase();
+  initializeRepositoriesList();
 
   const currentDate = new Date();
   let state;
@@ -215,6 +304,8 @@ async function main() {
     await csvWriter.writeRecords(mergedBugs);
     console.log(`Successfully wrote ${mergedBugs.length} bugs to ${CSV_FILE_PATH}.`);
     await generatePromptFiles(mergedBugs);
+
+    await syncPullRequests(connection, project, state);
 
   } catch (error) {
     console.error('Error connecting to Azure DevOps or fetching bugs:', error.message);
