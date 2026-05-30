@@ -9,6 +9,8 @@ const STATE_FILE_PATH = path.join(__dirname, 'state.json');
 const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
 const MEMORY_FILE_PATH = path.join(__dirname, 'sentinel5_memory.md');
 const REPOS_FILE_PATH = path.join(__dirname, 'repos.json');
+const WEEKLY_CHANGES_FILE_PATH = path.join(__dirname, 'weekly_changes.md');
+
 
 function stripHtmlTags(str) {
   if (!str) return '';
@@ -99,6 +101,8 @@ async function syncPullRequests(connection, project, state) {
     return;
   }
 
+  const allWeeklyPrs = [];
+
   for (const repoName of repos) {
     try {
       // Find the repository ID by name
@@ -127,14 +131,88 @@ async function syncPullRequests(connection, project, state) {
       console.log(`Found ${filteredPrs.length} relevant PRs in ${repoName}.`);
 
       // We can do something with the PRs later, for now we just log
-      filteredPrs.forEach(pr => {
+      for (const pr of filteredPrs) {
          console.log(`  - PR #${pr.pullRequestId}: ${pr.title} (Target: ${pr.targetRefName})`);
-      });
+
+         // Get commits for the PR
+         const commitsPage = await gitApi.getPullRequestCommits(targetRepo.id, pr.pullRequestId, project);
+         const commits = commitsPage || []; // Assuming array or array-like structure inside if paged
+
+         const fileImpactCounts = new Map();
+
+         if (commits && commits.length > 0) {
+           for (const commit of commits) {
+             try {
+               const commitChanges = await gitApi.getChanges(commit.commitId, targetRepo.id, project);
+               if (commitChanges && commitChanges.changes) {
+                 for (const change of commitChanges.changes) {
+                   if (change.item && change.item.path) {
+                     const path = change.item.path;
+                     fileImpactCounts.set(path, (fileImpactCounts.get(path) || 0) + 1);
+                   }
+                 }
+               }
+             } catch (commitErr) {
+               console.warn(`    Failed to fetch changes for commit ${commit.commitId}: ${commitErr.message}`);
+             }
+           }
+         }
+
+         // Sort files by impact count descending and take top 5
+         const topImpactedFiles = Array.from(fileImpactCounts.entries())
+           .sort((a, b) => b[1] - a[1])
+           .slice(0, 5)
+           .map(entry => entry[0]);
+
+         allWeeklyPrs.push({
+           repoName: repoName,
+           id: pr.pullRequestId,
+           title: pr.title,
+           author: pr.createdBy ? (pr.createdBy.displayName || pr.createdBy.uniqueName || 'Unknown') : 'Unknown',
+           closedDate: pr.closedDate ? new Date(pr.closedDate).toISOString() : 'Unknown',
+           description: stripHtmlTags(pr.description),
+           topImpactedFiles: topImpactedFiles
+         });
+      }
 
     } catch (err) {
        console.error(`Failed to sync PRs for ${repoName}: ${err.message}`);
     }
   }
+
+  generateWeeklyChangesReport(allWeeklyPrs, weekAgo, new Date());
+}
+
+function generateWeeklyChangesReport(prs, startDate, endDate) {
+  let markdown = `# Weekly Changes Report\n\n`;
+  markdown += `**Period:** ${startDate.toISOString()} to ${endDate.toISOString()}\n\n`;
+
+  if (prs.length === 0) {
+    markdown += `No merged pull requests found matching the criteria in the targeted repositories.\n`;
+  } else {
+    for (const pr of prs) {
+      markdown += `## PR #${pr.id}: ${pr.title}\n\n`;
+      markdown += `- **Repository:** ${pr.repoName}\n`;
+      markdown += `- **Author:** ${pr.author}\n`;
+      markdown += `- **Closed Date:** ${pr.closedDate}\n\n`;
+
+      markdown += `### Description\n`;
+      markdown += `${pr.description || 'No description provided.'}\n\n`;
+
+      markdown += `### Top Impacted Files\n`;
+      if (pr.topImpactedFiles.length > 0) {
+        for (const file of pr.topImpactedFiles) {
+          markdown += `- ${file}\n`;
+        }
+      } else {
+        markdown += `- No file changes detected or unable to fetch.\n`;
+      }
+      markdown += `\n---\n\n`;
+    }
+  }
+
+  fs.writeFileSync(WEEKLY_CHANGES_FILE_PATH, markdown, 'utf-8');
+  console.log(`Successfully generated ${WEEKLY_CHANGES_FILE_PATH}`);
 }
 
 async function main() {
