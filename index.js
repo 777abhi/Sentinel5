@@ -4,18 +4,13 @@ const azdev = require('azure-devops-node-api');
 const GitInterfaces = require('azure-devops-node-api/interfaces/GitInterfaces');
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+const { stripHtmlTags, formatDateToISO } = require('./utils');
 
 const STATE_FILE_PATH = path.join(__dirname, 'state.json');
 const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
 const MEMORY_FILE_PATH = path.join(__dirname, 'sentinel5_memory.md');
 const REPOS_FILE_PATH = path.join(__dirname, 'repos.json');
 const WEEKLY_CHANGES_FILE_PATH = path.join(__dirname, 'weekly_changes.md');
-
-
-function stripHtmlTags(str) {
-  if (!str) return '';
-  return str.replace(/<[^>]*>?/gm, '').trim();
-}
 
 function readExistingBugs(filePath) {
   return new Promise((resolve, reject) => {
@@ -310,8 +305,8 @@ async function main() {
         description: stripHtmlTags(fields['System.Description']),
         state: fields['System.State'] || '',
         tags: fields['System.Tags'] || '',
-        createdDate: fields['System.CreatedDate'] || '',
-        changedDate: fields['System.ChangedDate'] || ''
+        createdDate: formatDateToISO(fields['System.CreatedDate']),
+        changedDate: formatDateToISO(fields['System.ChangedDate'])
       };
     });
 
