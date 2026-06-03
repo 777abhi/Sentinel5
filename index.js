@@ -5,6 +5,7 @@ const GitInterfaces = require('azure-devops-node-api/interfaces/GitInterfaces');
 const csv = require('csv-parser');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const { stripHtmlTags, formatDateToISO } = require('./utils');
+const { generatePredictiveThreatPrompt } = require('./promptGenerator');
 
 const STATE_FILE_PATH = path.join(__dirname, 'state.json');
 const CSV_FILE_PATH = path.join(__dirname, 'defects.csv');
@@ -86,7 +87,7 @@ async function syncPullRequests(connection, project, state) {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
-  console.log(`Searching for pull requests merged since ${weekAgo.toISOString()} in ${repos.length} repositories...`);
+  console.log(`Searching for pull requests merged since ${formatDateToISO(weekAgo)} in ${repos.length} repositories...`);
 
   let gitRepos = [];
   try {
@@ -164,7 +165,7 @@ async function syncPullRequests(connection, project, state) {
            id: pr.pullRequestId,
            title: pr.title,
            author: pr.createdBy ? (pr.createdBy.displayName || pr.createdBy.uniqueName || 'Unknown') : 'Unknown',
-           closedDate: pr.closedDate ? new Date(pr.closedDate).toISOString() : 'Unknown',
+           closedDate: pr.closedDate ? formatDateToISO(pr.closedDate) : 'Unknown',
            description: stripHtmlTags(pr.description),
            topImpactedFiles: topImpactedFiles
          });
@@ -176,11 +177,12 @@ async function syncPullRequests(connection, project, state) {
   }
 
   generateWeeklyChangesReport(allWeeklyPrs, weekAgo, new Date());
+  await generatePredictiveThreatPrompt();
 }
 
 function generateWeeklyChangesReport(prs, startDate, endDate) {
   let markdown = `# Weekly Changes Report\n\n`;
-  markdown += `**Period:** ${startDate.toISOString()} to ${endDate.toISOString()}\n\n`;
+  markdown += `**Period:** ${formatDateToISO(startDate)} to ${formatDateToISO(endDate)}\n\n`;
 
   if (prs.length === 0) {
     markdown += `No merged pull requests found matching the criteria in the targeted repositories.\n`;
@@ -227,8 +229,8 @@ async function main() {
     startDate.setDate(startDate.getDate() - 30);
 
     state = {
-      startDate: startDate.toISOString(),
-      endDate: currentDate.toISOString()
+      startDate: formatDateToISO(startDate),
+      endDate: formatDateToISO(currentDate)
     };
 
     fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(state, null, 2), 'utf-8');
@@ -240,7 +242,7 @@ async function main() {
       const parsedState = JSON.parse(rawData);
 
       const newStartDate = parsedState.endDate; // The old endDate becomes the new startDate
-      const newEndDate = currentDate.toISOString();
+      const newEndDate = formatDateToISO(currentDate);
 
       state = {
         startDate: newStartDate,
