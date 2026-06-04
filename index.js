@@ -177,7 +177,6 @@ async function syncPullRequests(connection, project, state) {
   }
 
   generateWeeklyChangesReport(allWeeklyPrs, weekAgo, new Date());
-  await generatePredictiveThreatPrompt();
 }
 
 function generateWeeklyChangesReport(prs, startDate, endDate) {
@@ -262,6 +261,7 @@ async function main() {
     console.log('ADO credentials (ADO_ORG_URL, ADO_PAT, ADO_PROJECT) not provided. Skipping API sync.');
     const existingBugs = await readExistingBugs(CSV_FILE_PATH);
     await generatePromptFiles(existingBugs);
+    await generatePredictiveThreatPrompt();
     return;
   }
 
@@ -281,6 +281,7 @@ async function main() {
       console.log('No bugs found matching the criteria.');
       const existingBugs = await readExistingBugs(CSV_FILE_PATH);
       await generatePromptFiles(existingBugs);
+      await generatePredictiveThreatPrompt();
       return;
     }
 
@@ -387,6 +388,8 @@ async function main() {
     const existingBugs = await readExistingBugs(CSV_FILE_PATH);
     await generatePromptFiles(existingBugs);
   }
+
+  await generatePredictiveThreatPrompt();
 }
 
 main();
