@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { readExistingBugs, initializeRepositoriesList, initializeMemoryDatabase, manageState } = require('../stateManager');
+const { formatDateToISO } = require('../utils');
 
 test('stateManager', async (t) => {
   await t.test('initializeRepositoriesList creates file', () => {
@@ -42,7 +43,7 @@ test('stateManager', async (t) => {
     // Create initial state
     const oldEndDate = new Date();
     oldEndDate.setDate(oldEndDate.getDate() - 1);
-    const oldState = { startDate: '2023-01-01T00:00:00.000Z', endDate: oldEndDate.toISOString() };
+    const oldState = { startDate: '2023-01-01T00:00:00.000Z', endDate: formatDateToISO(oldEndDate) };
     fs.writeFileSync(testPath, JSON.stringify(oldState), 'utf8');
 
     const state = manageState(testPath);
