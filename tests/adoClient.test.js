@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { syncPullRequests, fetchAndMergeBugs } = require('../adoClient');
+const { formatDateToISO } = require('../utils');
 
 test('adoClient', async (t) => {
   await t.test('syncPullRequests returns empty if no repos file', async () => {
@@ -17,7 +18,7 @@ test('adoClient', async (t) => {
 
     const mockGitApi = {
       getRepositories: async () => [{ name: 'test-repo', id: '123' }],
-      getPullRequests: async () => [{ pullRequestId: 1, title: 'pr1', targetRefName: 'main', closedDate: new Date().toISOString() }],
+      getPullRequests: async () => [{ pullRequestId: 1, title: 'pr1', targetRefName: 'main', closedDate: formatDateToISO(new Date()) }],
       getPullRequestCommits: async () => [{ commitId: 'abc' }],
       getChanges: async () => ({ changes: [{ item: { path: 'file.js' } }] })
     };
