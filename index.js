@@ -3,6 +3,7 @@ const path = require('path');
 const azdev = require('azure-devops-node-api');
 const { generatePredictiveThreatPrompt } = require('./promptGenerator');
 const { readExistingBugs, initializeRepositoriesList, initializeMemoryDatabase, manageState } = require('./stateManager');
+const { ingestAnalysesToMemory } = require('./memoryUpdater');
 const { generateWeeklyChangesReport, generatePromptFiles } = require('./reportGenerator');
 const { syncPullRequests, fetchAndMergeBugs } = require('./adoClient');
 
@@ -27,11 +28,14 @@ async function main() {
     return;
   }
 
+  const analysesDir = path.join(__dirname, 'analyses');
+
   // ADO Integration
   if (!orgUrl || !token || !project) {
     console.log('ADO credentials (ADO_ORG_URL, ADO_PAT, ADO_PROJECT) not provided. Skipping API sync.');
     const existingBugs = await readExistingBugs(CSV_FILE_PATH);
     await generatePromptFiles(existingBugs, __dirname);
+    ingestAnalysesToMemory(analysesDir, MEMORY_FILE_PATH);
     await generatePredictiveThreatPrompt();
     return;
   }
@@ -56,6 +60,7 @@ async function main() {
     await generatePromptFiles(existingBugs, __dirname);
   }
 
+  ingestAnalysesToMemory(analysesDir, MEMORY_FILE_PATH);
   await generatePredictiveThreatPrompt();
 }
 
