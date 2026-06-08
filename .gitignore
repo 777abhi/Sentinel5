@@ -148,3 +148,5 @@ state.json
 defects.csv
 sentinel5_memory.md
 weekly_changes.md
+prompts/COMPILED_PREDICTIVE_THREAT_PROMPT.md
+analyses/
