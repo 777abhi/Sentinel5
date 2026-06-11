@@ -42,6 +42,8 @@ test('reportGenerator', async (t) => {
     assert.strictEqual(fs.existsSync(promptFilePath), true);
     const content = fs.readFileSync(promptFilePath, 'utf8');
     assert.ok(content.includes('# Bug 101: Bug 1'));
+    assert.ok(content.includes('### 4. Impacted Files / Directories'));
+    assert.ok(content.includes('### 5. Concrete Testing Mitigations'));
 
     if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true, force: true });
   });

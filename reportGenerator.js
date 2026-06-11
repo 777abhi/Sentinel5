@@ -76,7 +76,10 @@ Analyze the bug described above and provide your output in the following strict 
 ### 3. Leak Stage Discovery
 (Identify the exact phase of the development lifecycle where this defect leaked and explain why)
 
-### 4. Concrete Testing Mitigations
+### 4. Impacted Files / Directories
+(List the primary files, components, or directories that were modified to fix the defect)
+
+### 5. Concrete Testing Mitigations
 (Detail concrete testing mitigations and strategies to prevent this class of defect in the future)
 `;
       fs.writeFileSync(promptFile, markdown, 'utf8');

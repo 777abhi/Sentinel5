@@ -49,6 +49,7 @@ function ingestAnalysesToMemory(analysesDir, memoryFilePath) {
 
         let rootCause = 'Unknown';
         let mitigation = 'Unknown';
+        let impactedFiles = 'Unknown';
 
         const lines = analysisContent.split('\n');
         let currentSection = '';
@@ -59,7 +60,9 @@ function ingestAnalysesToMemory(analysesDir, memoryFilePath) {
           } else if (line.trim().length > 0 && !line.startsWith('(')) {
             if (currentSection === '2. Fault Categorization' && rootCause === 'Unknown') {
               rootCause = line.trim().replace(/\|/g, '-');
-            } else if (currentSection === '4. Concrete Testing Mitigations' && mitigation === 'Unknown') {
+            } else if (currentSection === '4. Impacted Files / Directories' && impactedFiles === 'Unknown') {
+              impactedFiles = line.trim().replace(/\|/g, '-');
+            } else if ((currentSection === '5. Concrete Testing Mitigations' || currentSection === '4. Concrete Testing Mitigations') && mitigation === 'Unknown') {
               mitigation = line.trim().replace(/\|/g, '-');
             }
           }
@@ -68,8 +71,9 @@ function ingestAnalysesToMemory(analysesDir, memoryFilePath) {
         // Truncate long texts to fit in table nicely
         rootCause = rootCause.length > 50 ? rootCause.substring(0, 47) + '...' : rootCause;
         mitigation = mitigation.length > 50 ? mitigation.substring(0, 47) + '...' : mitigation;
+        impactedFiles = impactedFiles.length > 50 ? impactedFiles.substring(0, 47) + '...' : impactedFiles;
 
-        newRows.push(`| ${bugId} | ${rootCause} | Unknown | ${mitigation} |`);
+        newRows.push(`| ${bugId} | ${rootCause} | ${impactedFiles} | ${mitigation} |`);
       }
     }
   }

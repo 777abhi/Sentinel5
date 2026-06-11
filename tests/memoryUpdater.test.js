@@ -22,7 +22,7 @@ test('memoryUpdater', async (t) => {
     assert.strictEqual(fs.existsSync(memoryFilePath), false);
   });
 
-  await t.test('ingests new analysis correctly', () => {
+  await t.test('ingests new analysis correctly with legacy format', () => {
     fs.writeFileSync(memoryFilePath, initialMemoryContent, 'utf-8');
 
     const analysisContent = `### 1. 5-Why Analysis\nWhy? Because.\n\n### 2. Fault Categorization\nNull Pointer Exception\n\n### 3. Leak Stage Discovery\nDev\n\n### 4. Concrete Testing Mitigations\nAdd unit test for null checks`;
@@ -32,6 +32,17 @@ test('memoryUpdater', async (t) => {
 
     const updatedMemory = fs.readFileSync(memoryFilePath, 'utf-8');
     assert.ok(updatedMemory.includes('| 101 | Null Pointer Exception | Unknown | Add unit test for null checks |'));
+    assert.ok(updatedMemory.includes('## Unstable System Paths'));
+  });
+
+  await t.test('ingests new analysis correctly with new format', () => {
+    const analysisContent = `### 1. 5-Why Analysis\nWhy? Because.\n\n### 2. Fault Categorization\nBoundary Error\n\n### 3. Leak Stage Discovery\nDev\n\n### 4. Impacted Files / Directories\nsrc/math.js\n\n### 5. Concrete Testing Mitigations\nAdd boundary tests`;
+    fs.writeFileSync(path.join(analysesDir, 'ANALYSIS_BUG_103.md'), analysisContent, 'utf-8');
+
+    ingestAnalysesToMemory(analysesDir, memoryFilePath);
+
+    const updatedMemory = fs.readFileSync(memoryFilePath, 'utf-8');
+    assert.ok(updatedMemory.includes('| 103 | Boundary Error | src/math.js | Add boundary tests |'));
     assert.ok(updatedMemory.includes('## Unstable System Paths'));
   });
 
