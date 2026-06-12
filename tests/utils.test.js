@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { stripHtmlTags, formatDateToISO } = require('./utils');
+const { stripHtmlTags, formatDateToISO } = require('../utils');
 
 test('stripHtmlTags', async (t) => {
   await t.test('strips standard HTML tags', () => {
