@@ -2,12 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { generatePredictiveThreatPrompt } = require('./promptGenerator');
+const { generatePredictiveThreatPrompt } = require('../promptGenerator');
 
-const PROMPT_TEMPLATE_PATH = path.join(__dirname, 'prompts', 'predictive_threat_ingestion_prompt.md');
-const WEEKLY_CHANGES_PATH = path.join(__dirname, 'weekly_changes.md');
-const MEMORY_PATH = path.join(__dirname, 'sentinel5_memory.md');
-const OUTPUT_PROMPT_PATH = path.join(__dirname, 'prompts', 'COMPILED_PREDICTIVE_THREAT_PROMPT.md');
+const PROMPT_TEMPLATE_PATH = path.join(__dirname, '..', 'prompts', 'predictive_threat_ingestion_prompt.md');
+const WEEKLY_CHANGES_PATH = path.join(__dirname, '..', 'weekly_changes.md');
+const MEMORY_PATH = path.join(__dirname, '..', 'sentinel5_memory.md');
+const OUTPUT_PROMPT_PATH = path.join(__dirname, '..', 'prompts', 'COMPILED_PREDICTIVE_THREAT_PROMPT.md');
 
 // Setup mock content
 const mockTemplate = '# Mock Template\nData:';
@@ -33,7 +33,7 @@ test('generatePredictiveThreatPrompt', async (t) => {
     if (origOutputExists) origOutput = fs.readFileSync(OUTPUT_PROMPT_PATH, 'utf-8');
 
     // Make sure dirs exist
-    const promptsDir = path.join(__dirname, 'prompts');
+    const promptsDir = path.join(__dirname, '..', 'prompts');
     if (!fs.existsSync(promptsDir)) {
       fs.mkdirSync(promptsDir);
     }
